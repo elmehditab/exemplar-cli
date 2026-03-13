@@ -6,11 +6,19 @@ import (
 )
 
 func newReviewCmd() *cobra.Command {
+
+	var repoPath string
+
 	cmd := &cobra.Command{
 		Use:   "review",
 		Short: "Run a code review pipeline",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			message, err := app.RunReview()
+
+			req := app.ReviewRequest{
+				RepoPath: repoPath,
+			}
+
+			message, err := app.RunReview(req)
 
 			if err != nil {
 				return err
@@ -20,5 +28,7 @@ func newReviewCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().StringVar(&repoPath, "repo", ".", "Path to the repository")
 	return cmd
 }
