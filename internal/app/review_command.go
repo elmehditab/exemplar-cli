@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+
 	"os"
 )
 
@@ -10,14 +11,17 @@ type ReviewRequest struct {
 }
 
 func RunReview(req ReviewRequest) (string, error) {
+
 	if req.RepoPath == "" {
 		return "", errors.New("repo path is required")
 	}
+
 	info, err := os.Stat(req.RepoPath)
 
 	if err != nil {
 		return "", errors.New("repo path does not exist: " + req.RepoPath)
 	}
+
 	if !info.IsDir() {
 		return "", errors.New("repo path must be a directory")
 	}
