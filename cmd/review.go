@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/mehditabet/exemplar-cli/internal/app"
+
 	"github.com/spf13/cobra"
 )
 
