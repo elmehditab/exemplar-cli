@@ -4,6 +4,8 @@ import (
 	"errors"
 
 	"os"
+
+	"github.com/mehditabet/exemplar-cli/internal/platform/git"
 )
 
 type ReviewRequest struct {
@@ -26,5 +28,11 @@ func RunReview(req ReviewRequest) (string, error) {
 		return "", errors.New("repo path must be a directory")
 	}
 
-	return "review command invoked for repo: " + req.RepoPath, nil
+	gitRoot, err := git.ResolveRepositoryRoot(req.RepoPath)
+
+	if err != nil {
+		return "", err
+	}
+
+	return "review command invoked for git repository: " + gitRoot, nil
 }
