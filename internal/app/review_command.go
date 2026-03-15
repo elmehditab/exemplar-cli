@@ -12,27 +12,32 @@ type ReviewRequest struct {
 	RepoPath string
 }
 
-func RunReview(req ReviewRequest) (string, error) {
+type ReviewResult struct {
+	RepositoryRoot string
+	Message        string
+}
+
+func RunReview(req ReviewRequest) (ReviewResult, error) {
 
 	if req.RepoPath == "" {
-		return "", errors.New("repo path is required")
+		return ReviewResult{}, errors.New("repo path is required")
 	}
 
 	info, err := os.Stat(req.RepoPath)
 
 	if err != nil {
-		return "", errors.New("repo path does not exist: " + req.RepoPath)
+		return ReviewResult{}, errors.New("repo path does not exist: " + req.RepoPath)
 	}
 
 	if !info.IsDir() {
-		return "", errors.New("repo path must be a directory")
+		return ReviewResult{}, errors.New("repo path must be a directory")
 	}
 
 	gitRoot, err := git.ResolveRepositoryRoot(req.RepoPath)
 
 	if err != nil {
-		return "", err
+		return ReviewResult{}, err
 	}
 
-	return "review command invoked for git repository: " + gitRoot, nil
+	return ReviewResult{RepositoryRoot: gitRoot, Message: "review command invoked for git repository: " + gitRoot}, nil
 }

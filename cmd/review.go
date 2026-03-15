@@ -19,13 +19,13 @@ func newReviewCmd() *cobra.Command {
 				RepoPath: repoPath,
 			}
 
-			message, err := app.RunReview(req)
+			result, err := app.RunReview(req)
 
 			if err != nil {
 				return err
 			}
 
-			cmd.Println(message)
+			cmd.Println(result.Message)
 			return nil
 		},
 	}
