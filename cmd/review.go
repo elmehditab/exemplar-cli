@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"github.com/mehditabet/exemplar-cli/internal/app"
+	"github.com/mehditabet/exemplar-cli/internal/core/review"
 
 	"github.com/spf13/cobra"
 )
@@ -15,7 +16,7 @@ func newReviewCmd() *cobra.Command {
 		Short: "Run a code review pipeline",
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			req := app.ReviewRequest{
+			req := review.ReviewRequest{
 				RepoPath: repoPath,
 			}
 
