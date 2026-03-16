@@ -1,0 +1,32 @@
+# Binaries
+exemplar-cli
+exemplar
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Go test / coverage
+*.test
+*.out
+coverage.out
+
+# Build directories
+dist/
+build/
+
+# IDE / editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+# Env files
+.env
+.env.local
+.env.*
+
+# plans
+plan.md

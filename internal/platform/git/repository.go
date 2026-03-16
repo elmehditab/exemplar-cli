@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func ResolveRepositoryRoot(repoPath string) (string, error) {
+func ResolveGitRepository(repoPath string) (string, error) {
 
 	cmd := exec.Command("git", "-C", repoPath, "rev-parse", "--show-toplevel")
 	out, err := cmd.Output()
