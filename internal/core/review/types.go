@@ -7,4 +7,7 @@ type ReviewRequest struct {
 type ReviewResult struct {
 	RepositoryRoot string
 	Message        string
+	Status         string
+	ExecutedStages []string
+	Warnings       []string
 }
