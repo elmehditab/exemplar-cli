@@ -34,3 +34,28 @@ func GetCurrentBranch(repoPath string) (string, error) {
 
 	return branch, nil
 }
+
+func GetChangedFiles(repoPath string) ([]string, error) {
+
+	cmd := exec.Command("git", "-C", repoPath, "status", "--porcelain")
+	out, err := cmd.Output()
+
+	if err != nil {
+		return nil, errors.New("failed to get changed files for repository: " + repoPath)
+	}
+
+	if len(out) == 0 {
+		return []string{}, nil
+	}
+
+	lines := strings.Split(string(out), "\n")
+	var changedFiles []string
+
+	for _, line := range lines {
+		if len(line) > 3 {
+			changedFiles = append(changedFiles, strings.TrimSpace(line[3:]))
+		}
+	}
+
+	return changedFiles, nil
+}

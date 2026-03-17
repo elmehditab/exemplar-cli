@@ -9,6 +9,7 @@ type ReviewResult struct {
 	Message        string
 	Status         string
 	CurrentBranch  string
+	ChangedFiles   []string
 	ExecutedStages []string
 	Warnings       []string
 }

@@ -13,6 +13,7 @@ type runState struct {
 	request        ReviewRequest
 	repositoryRoot string
 	currentBranch  string
+	changedFiles   []string
 	executedStages []string
 	warnings       []string
 }
@@ -64,7 +65,19 @@ func (p Pipeline) resolveCurrentBranch(state *runState) error {
 	state.currentBranch = branch
 
 	p.recordStage(state, "resolve_current_branch")
+	return nil
+}
 
+func (p Pipeline) resolveChangedFiles(state *runState) error {
+
+	changedFiles, err := git.GetChangedFiles(state.repositoryRoot)
+
+	if err != nil {
+		return err
+	}
+	state.changedFiles = changedFiles
+
+	p.recordStage(state, "resolve_changed_files")
 	return nil
 }
 
@@ -78,6 +91,7 @@ func (p Pipeline) buildResult(state *runState) ReviewResult {
 		Status:         "completed",
 		CurrentBranch:  state.currentBranch,
 		ExecutedStages: state.executedStages,
+		ChangedFiles:   state.changedFiles,
 		Warnings:       state.warnings,
 	}
 }
@@ -99,6 +113,12 @@ func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
 	}
 
 	err = p.resolveCurrentBranch(&state)
+
+	if err != nil {
+		return ReviewResult{}, err
+	}
+
+	err = p.resolveChangedFiles(&state)
 
 	if err != nil {
 		return ReviewResult{}, err
