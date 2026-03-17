@@ -12,6 +12,7 @@ type Pipeline struct{}
 type runState struct {
 	request        ReviewRequest
 	repositoryRoot string
+	currentBranch  string
 	executedStages []string
 	warnings       []string
 }
@@ -52,14 +53,30 @@ func (p Pipeline) resolveRepository(state *runState) error {
 	return nil
 }
 
+func (p Pipeline) resolveCurrentBranch(state *runState) error {
+
+	branch, err := git.GetCurrentBranch(state.repositoryRoot)
+
+	if err != nil {
+		return err
+	}
+
+	state.currentBranch = branch
+
+	p.recordStage(state, "resolve_current_branch")
+
+	return nil
+}
+
 func (p Pipeline) buildResult(state *runState) ReviewResult {
 
 	p.recordStage(state, "build_result")
 
 	return ReviewResult{
 		RepositoryRoot: state.repositoryRoot,
-		Message:        "review command invoked for git repository: " + state.repositoryRoot,
+		Message:        "review command invoked for git repository: " + state.repositoryRoot + " on branch: " + state.currentBranch,
 		Status:         "completed",
+		CurrentBranch:  state.currentBranch,
 		ExecutedStages: state.executedStages,
 		Warnings:       state.warnings,
 	}
@@ -76,6 +93,12 @@ func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
 	}
 
 	err = p.resolveRepository(&state)
+
+	if err != nil {
+		return ReviewResult{}, err
+	}
+
+	err = p.resolveCurrentBranch(&state)
 
 	if err != nil {
 		return ReviewResult{}, err
