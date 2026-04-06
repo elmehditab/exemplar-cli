@@ -12,12 +12,8 @@ type Pipeline struct{}
 
 type runState struct {
 	request        ReviewRequest
-	repositoryRoot string
-	currentBranch  string
-	changedFiles   []string
+	context        ReviewContext
 	executedStages []string
-	warnings       []string
-	diff           string
 }
 
 func (p Pipeline) validateRequest(state *runState) error {
@@ -49,7 +45,7 @@ func (p Pipeline) resolveRepository(state *runState) error {
 		return err
 	}
 
-	state.repositoryRoot = gitRoot
+	state.context.RepositoryRoot = gitRoot
 
 	p.recordStage(state, "resolve_repository")
 
@@ -58,13 +54,13 @@ func (p Pipeline) resolveRepository(state *runState) error {
 
 func (p Pipeline) resolveCurrentBranch(state *runState) error {
 
-	branch, err := git.GetCurrentBranch(state.repositoryRoot)
+	branch, err := git.GetCurrentBranch(state.context.RepositoryRoot)
 
 	if err != nil {
 		return err
 	}
 
-	state.currentBranch = branch
+	state.context.CurrentBranch = branch
 
 	p.recordStage(state, "resolve_current_branch")
 	return nil
@@ -72,12 +68,12 @@ func (p Pipeline) resolveCurrentBranch(state *runState) error {
 
 func (p Pipeline) resolveChangedFiles(state *runState) error {
 
-	changedFiles, err := git.GetChangedFiles(state.repositoryRoot)
+	changedFiles, err := git.GetChangedFiles(state.context.RepositoryRoot)
 
 	if err != nil {
 		return err
 	}
-	state.changedFiles = changedFiles
+	state.context.ChangedFiles = changedFiles
 
 	p.recordStage(state, "resolve_changed_files")
 	return nil
@@ -85,13 +81,13 @@ func (p Pipeline) resolveChangedFiles(state *runState) error {
 
 func (p Pipeline) resolveDiff(state *runState) error {
 
-	diff, err := git.GetDiff(state.repositoryRoot)
+	diff, err := git.GetDiff(state.context.RepositoryRoot)
 
 	if err != nil {
 		return err
 	}
 
-	state.diff = diff
+	state.context.Diff = diff
 
 	p.recordStage(state, "resolve_diff")
 	return nil
@@ -99,11 +95,11 @@ func (p Pipeline) resolveDiff(state *runState) error {
 
 func (p Pipeline) evaluateWorkspace(state *runState) error {
 
-	if len(state.changedFiles) == 0 {
-		state.warnings = append(state.warnings, "no changed files detected in the repository. The review will be based on the current state of the repository.")
+	if len(state.context.ChangedFiles) == 0 {
+		state.context.Warnings = append(state.context.Warnings, "no changed files detected in the repository. The review will be based on the current state of the repository.")
 	}
-	if len(state.changedFiles) > 0 && state.diff == "" {
-		state.warnings = append(state.warnings, "changed files detected but no diff could be resolved. The review will be based on the current state of the repository.")
+	if len(state.context.ChangedFiles) > 0 && state.context.Diff == "" {
+		state.context.Warnings = append(state.context.Warnings, "changed files detected but no diff could be resolved. The review will be based on the current state of the repository.")
 	}
 
 	p.recordStage(state, "evaluate_workspace")
@@ -111,64 +107,70 @@ func (p Pipeline) evaluateWorkspace(state *runState) error {
 	return nil
 }
 
-func (p Pipeline) buildResult(state *runState) ReviewResult {
-
-	p.recordStage(state, "build_result")
+func (p Pipeline) buildResult(ctx ReviewContext, executedStages []string) ReviewResult {
+	stages := append(append([]string(nil), executedStages...), "build_result")
 
 	return ReviewResult{
-		RepositoryRoot: state.repositoryRoot,
-		Message:        "review command invoked for git repository: " + state.repositoryRoot + " on branch: " + state.currentBranch + " with " + fmt.Sprint(len(state.changedFiles)) + " changed files.",
+		RepositoryRoot: ctx.RepositoryRoot,
+		Message:        "review command invoked for git repository: " + ctx.RepositoryRoot + " on branch: " + ctx.CurrentBranch + " with " + fmt.Sprint(len(ctx.ChangedFiles)) + " changed files.",
 		Status:         "completed",
-		CurrentBranch:  state.currentBranch,
-		ExecutedStages: state.executedStages,
-		ChangedFiles:   state.changedFiles,
-		Warnings:       state.warnings,
-		Diff:           state.diff,
+		CurrentBranch:  ctx.CurrentBranch,
+		ChangedFiles:   ctx.ChangedFiles,
+		ExecutedStages: stages,
+		Diff:           ctx.Diff,
+		Warnings:       ctx.Warnings,
 	}
 }
 
-func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
-
+func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, error) {
 	state := runState{request: req}
 
 	err := p.validateRequest(&state)
 
 	if err != nil {
-		return ReviewResult{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveRepository(&state)
 
 	if err != nil {
-		return ReviewResult{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveCurrentBranch(&state)
 
 	if err != nil {
-		return ReviewResult{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveChangedFiles(&state)
 
 	if err != nil {
-		return ReviewResult{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveDiff(&state)
 
 	if err != nil {
-		return ReviewResult{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.evaluateWorkspace(&state)
 
 	if err != nil {
+		return ReviewContext{}, nil, err
+	}
+
+	return state.context, append([]string(nil), state.executedStages...), nil
+}
+
+func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
+	ctx, executedStages, err := p.BuildContext(req)
+	if err != nil {
 		return ReviewResult{}, err
 	}
 
-	result := p.buildResult(&state)
-
+	result := p.buildResult(ctx, executedStages)
 	return result, nil
 }
 

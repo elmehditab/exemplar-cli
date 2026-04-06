@@ -118,6 +118,56 @@ func TestPipelineRunCleanRepository(t *testing.T) {
 	}
 }
 
+// Tests that the pipeline builds a reusable review context from repository state.
+func TestPipelineBuildContext(t *testing.T) {
+	t.Parallel()
+
+	repoDir := initGitRepository(t)
+	writeFile(t, repoDir, "main.go", "package main\n\nfunc main() {}\n")
+	gitRun(t, repoDir, "add", "main.go")
+	gitRun(t, repoDir, "commit", "-m", "initial commit")
+
+	writeFile(t, repoDir, "main.go", "package main\n\nfunc main() {\n\tprintln(\"changed\")\n}\n")
+
+	ctx, stages, err := Pipeline{}.BuildContext(ReviewRequest{RepoPath: repoDir})
+	if err != nil {
+		t.Fatalf("BuildContext returned error: %v", err)
+	}
+
+	if resolvePath(t, ctx.RepositoryRoot) != resolvePath(t, repoDir) {
+		t.Fatalf("expected repository root %q, got %q", repoDir, ctx.RepositoryRoot)
+	}
+
+	if ctx.CurrentBranch != "main" {
+		t.Fatalf("expected current branch main, got %q", ctx.CurrentBranch)
+	}
+
+	expectedFiles := []string{"main.go"}
+	if !reflect.DeepEqual(ctx.ChangedFiles, expectedFiles) {
+		t.Fatalf("expected changed files %v, got %v", expectedFiles, ctx.ChangedFiles)
+	}
+
+	if ctx.Diff == "" {
+		t.Fatal("expected non-empty diff")
+	}
+
+	if len(ctx.Warnings) != 0 {
+		t.Fatalf("expected no warnings, got %v", ctx.Warnings)
+	}
+
+	expectedStages := []string{
+		"validate_request",
+		"resolve_repository",
+		"resolve_current_branch",
+		"resolve_changed_files",
+		"resolve_diff",
+		"evaluate_workspace",
+	}
+	if !reflect.DeepEqual(stages, expectedStages) {
+		t.Fatalf("expected stages %v, got %v", expectedStages, stages)
+	}
+}
+
 // Tests that the pipeline detects changed files and returns the diff.
 func TestPipelineRunRepositoryWithChanges(t *testing.T) {
 	t.Parallel()
