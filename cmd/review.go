@@ -26,15 +26,35 @@ func newReviewCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Println("Repository Root:", result.RepositoryRoot)
-			cmd.Println("Current Branch:", result.CurrentBranch)
-			cmd.Println("Changed Files:", result.ChangedFiles)
-			cmd.Println("Diff:", result.Diff)
-			cmd.Println("Warnings:", result.Warnings)
+			printReviewResult(cmd, result)
 			return nil
 		},
 	}
 
 	cmd.Flags().StringVar(&repoPath, "repo", ".", "Path to the repository")
 	return cmd
+}
+
+func printReviewResult(cmd *cobra.Command, result review.ReviewResult) {
+	cmd.Println("Review Summary")
+	cmd.Println("Status:", result.Status)
+	cmd.Println("Repository:", result.RepositoryRoot)
+	cmd.Println("Branch:", result.CurrentBranch)
+	cmd.Println("Changed files:", len(result.ChangedFiles))
+
+	if len(result.ChangedFiles) > 0 {
+		cmd.Println()
+		cmd.Println("Changed Files")
+		for _, file := range result.ChangedFiles {
+			cmd.Println("-", file)
+		}
+	}
+
+	if len(result.Warnings) > 0 {
+		cmd.Println()
+		cmd.Println("Warnings")
+		for _, warning := range result.Warnings {
+			cmd.Println("-", warning)
+		}
+	}
 }
