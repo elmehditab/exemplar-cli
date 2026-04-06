@@ -12,4 +12,5 @@ type ReviewResult struct {
 	ChangedFiles   []string
 	ExecutedStages []string
 	Warnings       []string
+	Diff           string
 }

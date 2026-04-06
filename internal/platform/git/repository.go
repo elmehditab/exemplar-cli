@@ -59,3 +59,16 @@ func GetChangedFiles(repoPath string) ([]string, error) {
 
 	return changedFiles, nil
 }
+
+func GetDiff(repoPath string) (string, error) {
+
+	cmd := exec.Command("git", "-C", repoPath, "diff", "--no-ext-diff", "HEAD")
+	out, err := cmd.Output()
+
+	if err != nil {
+		return "", errors.New("failed to get diff for repository: " + repoPath)
+	}
+
+	diff := string(out)
+	return diff, nil
+}

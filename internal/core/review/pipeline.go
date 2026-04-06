@@ -2,6 +2,7 @@ package review
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/mehditabet/exemplar-cli/internal/platform/git"
@@ -16,6 +17,7 @@ type runState struct {
 	changedFiles   []string
 	executedStages []string
 	warnings       []string
+	diff           string
 }
 
 func (p Pipeline) validateRequest(state *runState) error {
@@ -81,18 +83,33 @@ func (p Pipeline) resolveChangedFiles(state *runState) error {
 	return nil
 }
 
+func (p Pipeline) resolveDiff(state *runState) error {
+
+	diff, err := git.GetDiff(state.repositoryRoot)
+
+	if err != nil {
+		return err
+	}
+
+	state.diff = diff
+
+	p.recordStage(state, "resolve_diff")
+	return nil
+}
+
 func (p Pipeline) buildResult(state *runState) ReviewResult {
 
 	p.recordStage(state, "build_result")
 
 	return ReviewResult{
 		RepositoryRoot: state.repositoryRoot,
-		Message:        "review command invoked for git repository: " + state.repositoryRoot + " on branch: " + state.currentBranch,
+		Message:        "review command invoked for git repository: " + state.repositoryRoot + " on branch: " + state.currentBranch + " with " + fmt.Sprint(len(state.changedFiles)) + " changed files.",
 		Status:         "completed",
 		CurrentBranch:  state.currentBranch,
 		ExecutedStages: state.executedStages,
 		ChangedFiles:   state.changedFiles,
 		Warnings:       state.warnings,
+		Diff:           state.diff,
 	}
 }
 
@@ -119,6 +136,12 @@ func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
 	}
 
 	err = p.resolveChangedFiles(&state)
+
+	if err != nil {
+		return ReviewResult{}, err
+	}
+
+	err = p.resolveDiff(&state)
 
 	if err != nil {
 		return ReviewResult{}, err
