@@ -26,7 +26,11 @@ func newReviewCmd() *cobra.Command {
 				return err
 			}
 
-			cmd.Println(result.Message)
+			cmd.Println("Repository Root:", result.RepositoryRoot)
+			cmd.Println("Current Branch:", result.CurrentBranch)
+			cmd.Println("Changed Files:", result.ChangedFiles)
+			cmd.Println("Diff:", result.Diff)
+			cmd.Println("Warnings:", result.Warnings)
 			return nil
 		},
 	}

@@ -97,6 +97,20 @@ func (p Pipeline) resolveDiff(state *runState) error {
 	return nil
 }
 
+func (p Pipeline) evaluateWorkspace(state *runState) error {
+
+	if len(state.changedFiles) == 0 {
+		state.warnings = append(state.warnings, "no changed files detected in the repository. The review will be based on the current state of the repository.")
+	}
+	if len(state.changedFiles) > 0 && state.diff == "" {
+		state.warnings = append(state.warnings, "changed files detected but no diff could be resolved. The review will be based on the current state of the repository.")
+	}
+
+	p.recordStage(state, "evaluate_workspace")
+
+	return nil
+}
+
 func (p Pipeline) buildResult(state *runState) ReviewResult {
 
 	p.recordStage(state, "build_result")
@@ -142,6 +156,12 @@ func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
 	}
 
 	err = p.resolveDiff(&state)
+
+	if err != nil {
+		return ReviewResult{}, err
+	}
+
+	err = p.evaluateWorkspace(&state)
 
 	if err != nil {
 		return ReviewResult{}, err
