@@ -13,6 +13,7 @@ type Pipeline struct{}
 type runState struct {
 	request        ReviewRequest
 	context        ReviewContext
+	findings       []Finding
 	executedStages []string
 }
 
@@ -107,7 +108,15 @@ func (p Pipeline) evaluateWorkspace(state *runState) error {
 	return nil
 }
 
-func (p Pipeline) buildResult(ctx ReviewContext, executedStages []string) ReviewResult {
+func (p Pipeline) collectFindings(state *runState) error {
+	state.findings = []Finding{}
+
+	p.recordStage(state, "collect_findings")
+
+	return nil
+}
+
+func (p Pipeline) buildResult(ctx ReviewContext, findings []Finding, executedStages []string) ReviewResult {
 	stages := append(append([]string(nil), executedStages...), "build_result")
 
 	return ReviewResult{
@@ -119,44 +128,54 @@ func (p Pipeline) buildResult(ctx ReviewContext, executedStages []string) Review
 		ExecutedStages: stages,
 		Diff:           ctx.Diff,
 		Warnings:       ctx.Warnings,
+		Findings:       append([]Finding(nil), findings...),
 	}
 }
 
-func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, error) {
+func (p Pipeline) prepareState(req ReviewRequest) (runState, error) {
 	state := runState{request: req}
 
 	err := p.validateRequest(&state)
 
 	if err != nil {
-		return ReviewContext{}, nil, err
+		return runState{}, err
 	}
 
 	err = p.resolveRepository(&state)
 
 	if err != nil {
-		return ReviewContext{}, nil, err
+		return runState{}, err
 	}
 
 	err = p.resolveCurrentBranch(&state)
 
 	if err != nil {
-		return ReviewContext{}, nil, err
+		return runState{}, err
 	}
 
 	err = p.resolveChangedFiles(&state)
 
 	if err != nil {
-		return ReviewContext{}, nil, err
+		return runState{}, err
 	}
 
 	err = p.resolveDiff(&state)
 
 	if err != nil {
-		return ReviewContext{}, nil, err
+		return runState{}, err
 	}
 
 	err = p.evaluateWorkspace(&state)
 
+	if err != nil {
+		return runState{}, err
+	}
+
+	return state, nil
+}
+
+func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, error) {
+	state, err := p.prepareState(req)
 	if err != nil {
 		return ReviewContext{}, nil, err
 	}
@@ -165,12 +184,16 @@ func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, erro
 }
 
 func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
-	ctx, executedStages, err := p.BuildContext(req)
+	state, err := p.prepareState(req)
 	if err != nil {
 		return ReviewResult{}, err
 	}
 
-	result := p.buildResult(ctx, executedStages)
+	if err := p.collectFindings(&state); err != nil {
+		return ReviewResult{}, err
+	}
+
+	result := p.buildResult(state.context, state.findings, state.executedStages)
 	return result, nil
 }
 
