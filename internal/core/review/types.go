@@ -66,13 +66,14 @@ type ParseDiff struct {
 }
 
 type DiffFile struct {
-	Path               string
-	OldPath            string
-	Status             string
-	Hunks              []DiffHunk
-	AddedCount         int
-	DeletedCount       int
-	FileClassification string
+	OldPath  string
+	NewPath  string
+	IsNew    bool
+	IsDelete bool
+	IsRename bool
+	IsCopy   bool
+	Hunks    []DiffHunk
+	isBinary bool
 }
 
 type DiffHunk struct {
@@ -81,8 +82,6 @@ type DiffHunk struct {
 }
 
 type DiffLine struct {
-	Content    string
-	OldLineNum int
-	NewLineNum int
-	Kind       string
+	Operation string
+	Content   string
 }

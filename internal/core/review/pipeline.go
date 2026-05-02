@@ -4,7 +4,9 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
+	"github.com/bluekeyes/go-gitdiff/gitdiff"
 	"github.com/mehditabet/exemplar-cli/internal/platform/git"
 )
 
@@ -93,6 +95,53 @@ func (p Pipeline) resolveDiff(state *runState) error {
 	p.recordStage(state, "resolve_diff")
 	return nil
 }
+func (p Pipeline) parseDiff(state *runState) error {
+
+	if state.context.Diff == "" {
+		state.context.ParseDiff = ParseDiff{Files: []DiffFile{}}
+		p.recordStage(state, "parse_diff")
+		return nil
+	}
+	files, _, err := gitdiff.Parse(strings.NewReader(state.context.Diff))
+
+	if err != nil {
+		return err
+	}
+	parseFiles := make([]DiffFile, 0, len(files))
+
+	for _, file := range files {
+		diffFile := DiffFile{
+			OldPath:  file.OldName,
+			NewPath:  file.NewName,
+			IsNew:    file.IsNew,
+			IsDelete: file.IsDelete,
+			IsRename: file.IsRename,
+			IsCopy:   file.IsCopy,
+			Hunks:    make([]DiffHunk, 0, len(file.TextFragments)),
+			isBinary: file.IsBinary,
+		}
+
+		for _, hunk := range file.TextFragments {
+			hunk := DiffHunk{
+				Header: hunk.Header(),
+				Lines:  make([]DiffLine, 0, len(hunk.Lines)),
+			}
+
+			for _, line := range hunk.Lines {
+				hunk.Lines = append(hunk.Lines, DiffLine{
+					Operation: line.Operation,
+					Content:   line.Content,
+				})
+			}
+			diffFile.Hunks = append(diffFile.Hunks, hunk)
+		}
+		parseFiles = append(parseFiles, diffFile)
+	}
+
+	state.context.ParseDiff = ParseDiff{Files: parseFiles}
+	p.recordStage(state, "parse_diff")
+	return nil
+}
 
 func (p Pipeline) evaluateWorkspace(state *runState) error {
 
@@ -108,15 +157,7 @@ func (p Pipeline) evaluateWorkspace(state *runState) error {
 	return nil
 }
 
-func (p Pipeline) collectFindings(state *runState) error {
-	state.findings = []Finding{}
-
-	p.recordStage(state, "collect_findings")
-
-	return nil
-}
-
-func (p Pipeline) buildResult(ctx ReviewContext, findings []Finding, executedStages []string) ReviewResult {
+func (p Pipeline) buildResult(ctx ReviewContext, executedStages []string) ReviewResult {
 	stages := append(append([]string(nil), executedStages...), "build_result")
 
 	return ReviewResult{
@@ -128,54 +169,50 @@ func (p Pipeline) buildResult(ctx ReviewContext, findings []Finding, executedSta
 		ExecutedStages: stages,
 		Diff:           ctx.Diff,
 		Warnings:       ctx.Warnings,
-		Findings:       append([]Finding(nil), findings...),
 	}
 }
 
-func (p Pipeline) prepareState(req ReviewRequest) (runState, error) {
+func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, error) {
 	state := runState{request: req}
 
 	err := p.validateRequest(&state)
 
 	if err != nil {
-		return runState{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveRepository(&state)
 
 	if err != nil {
-		return runState{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveCurrentBranch(&state)
 
 	if err != nil {
-		return runState{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveChangedFiles(&state)
 
 	if err != nil {
-		return runState{}, err
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.resolveDiff(&state)
 
 	if err != nil {
-		return runState{}, err
+		return ReviewContext{}, nil, err
+	}
+
+	err = p.parseDiff(&state)
+
+	if err != nil {
+		return ReviewContext{}, nil, err
 	}
 
 	err = p.evaluateWorkspace(&state)
 
-	if err != nil {
-		return runState{}, err
-	}
-
-	return state, nil
-}
-
-func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, error) {
-	state, err := p.prepareState(req)
 	if err != nil {
 		return ReviewContext{}, nil, err
 	}
@@ -184,16 +221,12 @@ func (p Pipeline) BuildContext(req ReviewRequest) (ReviewContext, []string, erro
 }
 
 func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
-	state, err := p.prepareState(req)
+	ctx, executedStages, err := p.BuildContext(req)
 	if err != nil {
 		return ReviewResult{}, err
 	}
 
-	if err := p.collectFindings(&state); err != nil {
-		return ReviewResult{}, err
-	}
-
-	result := p.buildResult(state.context, state.findings, state.executedStages)
+	result := p.buildResult(ctx, executedStages)
 	return result, nil
 }
 
