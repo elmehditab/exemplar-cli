@@ -98,7 +98,7 @@ func (p Pipeline) resolveDiff(state *runState) error {
 func (p Pipeline) parseDiff(state *runState) error {
 
 	if state.context.Diff == "" {
-		state.context.ParseDiff = ParseDiff{Files: []DiffFile{}}
+		state.context.ParsedDiff = ParsedDiff{Files: []DiffFile{}}
 		p.recordStage(state, "parse_diff")
 		return nil
 	}
@@ -107,38 +107,74 @@ func (p Pipeline) parseDiff(state *runState) error {
 	if err != nil {
 		return err
 	}
-	parseFiles := make([]DiffFile, 0, len(files))
+	parsedDiff := ParsedDiff{
+		Files: make([]DiffFile, 0, len(files)),
+	}
 
 	for _, file := range files {
 		diffFile := DiffFile{
 			OldPath:  file.OldName,
 			NewPath:  file.NewName,
+			Status:   diffFileStatus(file),
 			IsNew:    file.IsNew,
 			IsDelete: file.IsDelete,
 			IsRename: file.IsRename,
 			IsCopy:   file.IsCopy,
+			IsBinary: file.IsBinary,
 			Hunks:    make([]DiffHunk, 0, len(file.TextFragments)),
-			isBinary: file.IsBinary,
 		}
 
-		for _, hunk := range file.TextFragments {
-			hunk := DiffHunk{
-				Header: hunk.Header(),
-				Lines:  make([]DiffLine, 0, len(hunk.Lines)),
+		if file.IsBinary {
+			parsedDiff.Stats.BinaryFiles++
+		}
+
+		for _, fragment := range file.TextFragments {
+			diffHunk := DiffHunk{
+				Header:       fragment.Header(),
+				OldStart:     int(fragment.OldPosition),
+				OldLineSpan:  int(fragment.OldLines),
+				NewStart:     int(fragment.NewPosition),
+				NewLineSpan:  int(fragment.NewLines),
+				LinesAdded:   int(fragment.LinesAdded),
+				LinesDeleted: int(fragment.LinesDeleted),
+				Lines:        make([]DiffLine, 0, len(fragment.Lines)),
 			}
 
-			for _, line := range hunk.Lines {
-				hunk.Lines = append(hunk.Lines, DiffLine{
-					Operation: line.Operation,
-					Content:   line.Content,
-				})
+			oldLineNumber := int(fragment.OldPosition)
+			newLineNumber := int(fragment.NewPosition)
+
+			for _, line := range fragment.Lines {
+				diffLine := DiffLine{
+					Operation: diffLineOperation(line.Op),
+					Content:   strings.TrimSuffix(line.Line, "\n"),
+					NoNewline: line.NoEOL(),
+				}
+
+				if line.Old() {
+					diffLine.OldLineNumber = oldLineNumber
+					oldLineNumber++
+				}
+
+				if line.New() {
+					diffLine.NewLineNumber = newLineNumber
+					newLineNumber++
+				}
+
+				diffHunk.Lines = append(diffHunk.Lines, diffLine)
 			}
-			diffFile.Hunks = append(diffFile.Hunks, hunk)
+
+			diffFile.LinesAdded += diffHunk.LinesAdded
+			diffFile.LinesDeleted += diffHunk.LinesDeleted
+			diffFile.Hunks = append(diffFile.Hunks, diffHunk)
 		}
-		parseFiles = append(parseFiles, diffFile)
+
+		parsedDiff.Stats.LinesAdded += diffFile.LinesAdded
+		parsedDiff.Stats.LinesDeleted += diffFile.LinesDeleted
+		parsedDiff.Files = append(parsedDiff.Files, diffFile)
 	}
 
-	state.context.ParseDiff = ParseDiff{Files: parseFiles}
+	parsedDiff.Stats.FilesChanged = len(parsedDiff.Files)
+	state.context.ParsedDiff = parsedDiff
 	p.recordStage(state, "parse_diff")
 	return nil
 }
@@ -168,6 +204,7 @@ func (p Pipeline) buildResult(ctx ReviewContext, executedStages []string) Review
 		ChangedFiles:   ctx.ChangedFiles,
 		ExecutedStages: stages,
 		Diff:           ctx.Diff,
+		ParsedDiff:     ctx.ParsedDiff,
 		Warnings:       ctx.Warnings,
 	}
 }
@@ -232,4 +269,34 @@ func (p Pipeline) Run(req ReviewRequest) (ReviewResult, error) {
 
 func (p Pipeline) recordStage(state *runState, stageName string) {
 	state.executedStages = append(state.executedStages, stageName)
+}
+
+func diffFileStatus(file *gitdiff.File) DiffFileStatus {
+	if file.IsBinary {
+		return DiffFileStatusBinary
+	}
+	if file.IsNew {
+		return DiffFileStatusAdded
+	}
+	if file.IsDelete {
+		return DiffFileStatusDeleted
+	}
+	if file.IsRename {
+		return DiffFileStatusRenamed
+	}
+	if file.IsCopy {
+		return DiffFileStatusCopied
+	}
+	return DiffFileStatusModified
+}
+
+func diffLineOperation(op gitdiff.LineOp) DiffLineOperation {
+	switch op {
+	case gitdiff.OpAdd:
+		return DiffLineOperationAdded
+	case gitdiff.OpDelete:
+		return DiffLineOperationDeleted
+	default:
+		return DiffLineOperationContext
+	}
 }

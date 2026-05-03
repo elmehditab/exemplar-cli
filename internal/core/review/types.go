@@ -9,7 +9,7 @@ type ReviewContext struct {
 	CurrentBranch  string
 	ChangedFiles   []string
 	Diff           string
-	ParseDiff      ParseDiff
+	ParsedDiff     ParsedDiff
 	Warnings       []string
 }
 
@@ -21,6 +21,7 @@ type ReviewResult struct {
 	ChangedFiles   []string
 	ExecutedStages []string
 	Diff           string
+	ParsedDiff     ParsedDiff
 	Warnings       []string
 	Findings       []Finding
 }
@@ -61,27 +62,66 @@ type Evidence struct {
 	Description string
 }
 
-type ParseDiff struct {
+type ParsedDiff struct {
 	Files []DiffFile
+	Stats DiffStats
+}
+
+type DiffStats struct {
+	FilesChanged int
+	LinesAdded   int
+	LinesDeleted int
+	BinaryFiles  int
 }
 
 type DiffFile struct {
-	OldPath  string
-	NewPath  string
-	IsNew    bool
-	IsDelete bool
-	IsRename bool
-	IsCopy   bool
-	Hunks    []DiffHunk
-	isBinary bool
+	OldPath      string
+	NewPath      string
+	Status       DiffFileStatus
+	IsNew        bool
+	IsDelete     bool
+	IsRename     bool
+	IsCopy       bool
+	IsBinary     bool
+	LinesAdded   int
+	LinesDeleted int
+	Hunks        []DiffHunk
 }
 
+type DiffFileStatus string
+
+const (
+	DiffFileStatusModified DiffFileStatus = "modified"
+	DiffFileStatusAdded    DiffFileStatus = "added"
+	DiffFileStatusDeleted  DiffFileStatus = "deleted"
+	DiffFileStatusRenamed  DiffFileStatus = "renamed"
+	DiffFileStatusCopied   DiffFileStatus = "copied"
+	DiffFileStatusBinary   DiffFileStatus = "binary"
+)
+
 type DiffHunk struct {
-	Header string
-	Lines  []DiffLine
+	Header       string
+	OldStart     int
+	OldLineSpan  int
+	NewStart     int
+	NewLineSpan  int
+	LinesAdded   int
+	LinesDeleted int
+	Lines        []DiffLine
 }
 
 type DiffLine struct {
-	Operation string
-	Content   string
+	Operation     DiffLineOperation
+	Content       string
+	OldLineNumber int
+	NewLineNumber int
+	NoNewline     bool
 }
+
+type DiffLineOperation string
+
+const (
+	DiffLineOperationContext DiffLineOperation = "context"
+	DiffLineOperationAdded   DiffLineOperation = "added"
+	DiffLineOperationDeleted DiffLineOperation = "deleted"
+)
