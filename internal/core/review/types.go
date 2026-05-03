@@ -63,8 +63,9 @@ type Evidence struct {
 }
 
 type ParsedDiff struct {
-	Files []DiffFile
-	Stats DiffStats
+	Files         []DiffFile
+	ReviewTargets []ReviewTarget
+	Stats         DiffStats
 }
 
 type DiffStats struct {
@@ -116,6 +117,15 @@ type DiffLine struct {
 	OldLineNumber int
 	NewLineNumber int
 	NoNewline     bool
+}
+
+type ReviewTarget struct {
+	FilePath      string
+	Line          int
+	Content       string
+	HunkHeader    string
+	ContextBefore []DiffLine
+	ContextAfter  []DiffLine
 }
 
 type DiffLineOperation string

@@ -12,6 +12,10 @@ The project is based on two public references:
 The idea is simple: do not review code from the diff alone.
 Retrieve relevant context first (code, history, conventions, exemplars), then generate findings with evidence.
 
+## Preview
+
+![Exemplar CLI welcome screen](docs/exemplar-cli-preview.svg)
+
 ## Open and Run the Project
 
 ### Prerequisites
@@ -31,10 +35,16 @@ Or open the folder directly in VS Code.
 ### 2) Run the CLI
 
 ```bash
+go run .
+```
+
+### 3) Run a review
+
+```bash
 go run . review --repo .
 ```
 
-### 3) Run tests
+### 4) Run tests
 
 ```bash
 go test ./...

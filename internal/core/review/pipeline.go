@@ -165,6 +165,7 @@ func (p Pipeline) parseDiff(state *runState) error {
 
 			diffFile.LinesAdded += diffHunk.LinesAdded
 			diffFile.LinesDeleted += diffHunk.LinesDeleted
+			parsedDiff.ReviewTargets = append(parsedDiff.ReviewTargets, reviewTargetsForHunk(diffFile.NewPath, diffHunk)...)
 			diffFile.Hunks = append(diffFile.Hunks, diffHunk)
 		}
 
@@ -299,4 +300,39 @@ func diffLineOperation(op gitdiff.LineOp) DiffLineOperation {
 	default:
 		return DiffLineOperationContext
 	}
+}
+
+func reviewTargetsForHunk(filePath string, hunk DiffHunk) []ReviewTarget {
+	targets := []ReviewTarget{}
+
+	for index, line := range hunk.Lines {
+		if line.Operation != DiffLineOperationAdded {
+			continue
+		}
+
+		targets = append(targets, ReviewTarget{
+			FilePath:      filePath,
+			Line:          line.NewLineNumber,
+			Content:       line.Content,
+			HunkHeader:    hunk.Header,
+			ContextBefore: surroundingLines(hunk.Lines, index-2, index),
+			ContextAfter:  surroundingLines(hunk.Lines, index+1, index+3),
+		})
+	}
+
+	return targets
+}
+
+func surroundingLines(lines []DiffLine, start int, end int) []DiffLine {
+	if start < 0 {
+		start = 0
+	}
+	if end > len(lines) {
+		end = len(lines)
+	}
+	if start >= end {
+		return []DiffLine{}
+	}
+
+	return append([]DiffLine(nil), lines[start:end]...)
 }

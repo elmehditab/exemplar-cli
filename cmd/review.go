@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/mehditabet/exemplar-cli/internal/app"
 	"github.com/mehditabet/exemplar-cli/internal/core/review"
 
@@ -41,12 +43,25 @@ func printReviewResult(cmd *cobra.Command, result review.ReviewResult) {
 	cmd.Println("Repository:", result.RepositoryRoot)
 	cmd.Println("Branch:", result.CurrentBranch)
 	cmd.Println("Changed files:", len(result.ChangedFiles))
+	cmd.Println("Parsed files:", result.ParsedDiff.Stats.FilesChanged)
+	cmd.Println("Review targets:", len(result.ParsedDiff.ReviewTargets))
+	cmd.Println("Lines added:", result.ParsedDiff.Stats.LinesAdded)
+	cmd.Println("Lines deleted:", result.ParsedDiff.Stats.LinesDeleted)
+	cmd.Println("Binary files:", result.ParsedDiff.Stats.BinaryFiles)
 
 	if len(result.ChangedFiles) > 0 {
 		cmd.Println()
 		cmd.Println("Changed Files")
 		for _, file := range result.ChangedFiles {
 			cmd.Println("-", file)
+		}
+	}
+
+	if len(result.ParsedDiff.Files) > 0 {
+		cmd.Println()
+		cmd.Println("Parsed Diff")
+		for _, file := range result.ParsedDiff.Files {
+			cmd.Println("-", file.Status, displayDiffPath(file), "("+lineStats(file)+")")
 		}
 	}
 
@@ -57,4 +72,15 @@ func printReviewResult(cmd *cobra.Command, result review.ReviewResult) {
 			cmd.Println("-", warning)
 		}
 	}
+}
+
+func displayDiffPath(file review.DiffFile) string {
+	if file.NewPath != "" {
+		return file.NewPath
+	}
+	return file.OldPath
+}
+
+func lineStats(file review.DiffFile) string {
+	return fmt.Sprintf("+%d -%d", file.LinesAdded, file.LinesDeleted)
 }
